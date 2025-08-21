@@ -1,18 +1,21 @@
 import { describe, expect, it, vi } from 'vitest'
 import type { API, CameraRecordingConfiguration, HAP } from 'homebridge'
-import { AudioRecordingCodecType, H264Level, H264Profile } from 'homebridge'
+import { AudioRecordingCodecType, AudioRecordingSamplerate, H264Level, H264Profile } from 'homebridge'
 
 import { RecordingDelegate } from './recordingDelegate.js'
 import type { VideoConfig } from './settings.js'
-import type { Logger } from './logger.js'
+import { Logger } from './logger.js'
 
 describe('RecordingDelegate', () => {
-  const mockLogger: Logger = {
+  const mockLogging = {
+    success: vi.fn(),
     info: vi.fn(),
     warn: vi.fn(),
     error: vi.fn(),
     debug: vi.fn(),
   }
+
+  const mockLogger = new Logger(mockLogging as any)
 
   const mockAPI: Partial<API> = {
     on: vi.fn(),
@@ -27,6 +30,8 @@ describe('RecordingDelegate', () => {
   }
 
   const mockRecordingConfiguration: CameraRecordingConfiguration = {
+    prebufferLength: 4000,
+    eventTriggerTypes: [],
     mediaContainerConfiguration: {
       type: 0,
       fragmentLength: 4000,
@@ -43,7 +48,7 @@ describe('RecordingDelegate', () => {
     },
     audioCodec: {
       type: AudioRecordingCodecType.AAC_LC,
-      samplerate: 32,
+      samplerate: AudioRecordingSamplerate.KHZ_32,
       bitrate: 32,
       audioChannels: 1,
     },
@@ -118,9 +123,8 @@ describe('RecordingDelegate', () => {
     const result = await generator.next()
 
     expect(result.done).toBe(true)
-    expect(mockLogger.error).toHaveBeenCalledWith(
-      'No recording configuration available',
-      'test-camera',
+    expect(mockLogging.error).toHaveBeenCalledWith(
+      '[test-camera] No recording configuration available',
     )
   })
 })

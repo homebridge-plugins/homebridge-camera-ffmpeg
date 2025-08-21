@@ -123,12 +123,12 @@ export class RecordingDelegate implements CameraRecordingDelegate {
       }
     } catch (error) {
       this.log.error(`Recording stream error: ${error}`, this.cameraName)
-    } finally {
-      // Yield final packet to signal end of stream
-      yield {
-        data: Buffer.alloc(0),
-        isLast: true,
-      }
+    }
+    
+    // Always yield final packet to signal end of stream
+    yield {
+      data: Buffer.alloc(0),
+      isLast: true,
     }
   }
 
