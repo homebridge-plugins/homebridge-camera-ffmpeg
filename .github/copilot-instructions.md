@@ -202,6 +202,49 @@ The plugin supports automation via:
 - **HTTP**: RESTful API for triggering events
 - **Switches**: HomeKit switches for manual triggering
 
+### Tested Configuration Management
+The repository maintains a collection of tested camera configurations submitted by users via GitHub issues labeled "tested config". These configurations are displayed on the project documentation website at https://sunoo.github.io/homebridge-camera-ffmpeg/configs/.
+
+#### Processing Tested Config Issues
+When working with issues that have the "tested config" label:
+
+1. **Identify Tested Config Issues**: Look for issues created using the `.github/ISSUE_TEMPLATE/tested_config.md` template with the "tested config" label.
+
+2. **Extract Configuration Data**: These issues contain:
+   - **Manufacturer/Model**: Camera brand and model information
+   - **Homebridge Config**: Working JSON configuration for the camera
+   - **Additional Information**: Setup notes, troubleshooting tips, or special requirements
+
+3. **Validate Configuration**: Ensure the submitted configuration:
+   - Uses proper JSON syntax
+   - Contains required fields (`platform`, `cameras` array with `name` and `videoConfig.source`)
+   - Follows the plugin's configuration schema defined in `config.schema.json`
+   - Removes sensitive information (passwords, tokens, IP addresses should be sanitized)
+
+4. **Documentation Integration**: Tested configurations should be added to the project documentation website. The configurations are referenced in:
+   - `README.md` line 18: Links to the configs page
+   - `config.schema.json`: Footer display references the configs page
+   - Multiple automation documentation pages on the site
+
+5. **Issue Lifecycle**: Issues with "tested config" label are:
+   - Exempt from the stale workflow (see `.github/workflows/stale.yml`)
+   - Kept open as a permanent reference for the configuration
+   - Should be organized and categorized by camera manufacturer/model
+
+#### Best Practices for Tested Configs
+- **Sanitization**: Always review configurations for sensitive data before documentation
+- **Categorization**: Group configurations by manufacturer (e.g., Hikvision, Dahua, Reolink)
+- **Validation**: Test configurations match the current plugin schema
+- **Documentation**: Include setup notes and any special requirements
+- **Updates**: Update documentation links when adding new tested configurations
+
+#### Integration with Documentation Website
+The project uses a documentation website (sunoo.github.io/homebridge-camera-ffmpeg/) that includes:
+- `/configs/` - Tested configuration repository
+- `/automation/mqtt.html` - MQTT automation documentation  
+- `/automation/http.html` - HTTP automation documentation
+- `/automation/switch.html` - Switch automation documentation
+
 ### Version Information
 Current version: 4.0.1 (major version with breaking changes from v3.x)
 - Dropped Node.js v18 support
