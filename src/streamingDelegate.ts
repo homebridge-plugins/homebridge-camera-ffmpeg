@@ -114,7 +114,7 @@ export class StreamingDelegate implements CameraStreamingDelegate {
           ],
         },
       },
-      recording: /*! this.recording ? undefined : */ {
+      recording: !this.recording ? undefined : {
         options: {
           prebufferLength: PREBUFFER_LENGTH,
           overrideEventTriggerOptions: [hap.EventTriggerOption.MOTION, hap.EventTriggerOption.DOORBELL],
