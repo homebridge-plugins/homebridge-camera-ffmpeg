@@ -115,6 +115,18 @@ export class RecordingDelegate implements CameraRecordingDelegate {
       return
     }
 
+    // Ensure prebuffer is started if prebuffering is enabled
+    if (this.videoConfig?.prebuffer) {
+      this.log.debug(`HKSV: Prebuffer enabled, ensuring prebuffer is started`, this.cameraName)
+      try {
+        await this.startPreBuffer()
+        this.log.debug(`HKSV: Prebuffer initialization completed`, this.cameraName)
+      } catch (error) {
+        this.log.error(`HKSV: Failed to start prebuffer: ${error}`, this.cameraName)
+        // Continue without prebuffer if it fails
+      }
+    }
+
     // Create abort controller for this stream
     const abortController = new AbortController()
     this.streamAbortControllers.set(streamId, abortController)
@@ -295,42 +307,48 @@ export class RecordingDelegate implements CameraRecordingDelegate {
       ? '4.0'
       : configuration.videoCodec.parameters.level === H264Level.LEVEL3_2 ? '3.2' : '3.1'
 
-    // Clean H.264 parameters for HKSV compatibility
+    // HKSV-compatible H.264 parameters for recording
     const videoArgs: Array<string> = [
       '-an', '-sn', '-dn',            // Disable audio/subtitles/data (audio handled separately)
       '-vcodec', 'libx264',
       '-pix_fmt', 'yuv420p',
-      '-profile:v', profile, // 'baseline' tested
-      '-level:v', level, // '3.1' tested
-      '-preset', 'ultrafast',         
+      '-profile:v', profile,          // Use configuration profile
+      '-level:v', level,              // Use configuration level
+      '-preset', 'veryfast',          // Faster than ultrafast for stability
       '-tune', 'zerolatency',         
-      '-b:v', '600k',                 
-      '-maxrate', '700k',             
-      '-bufsize', '1400k',            
-      '-g', '30',                     
-      '-keyint_min', '15',            
-      '-sc_threshold', '0',           
-      '-force_key_frames', 'expr:gte(t,n_forced*1)'
+      '-b:v', `${configuration.videoCodec.parameters.bitRate}k`, // Use configured bitrate
+      '-maxrate', `${Math.floor(configuration.videoCodec.parameters.bitRate * 1.2)}k`, // 20% overhead
+      '-bufsize', `${configuration.videoCodec.parameters.bitRate * 2}k`,              // 2x bitrate for buffer
+      '-g', '30',                     // GOP size
+      '-keyint_min', '15',            // Minimum keyframe interval  
+      '-sc_threshold', '0',           // Disable scene change detection
+      '-force_key_frames', 'expr:gte(t,n_forced*1)', // Force keyframes every second
+      '-r', configuration.videoCodec.resolution[2].toString() // Use configured framerate
     ]
 
     if (configuration?.audioCodec) {
-      // Remove the '-an' flag to enable audio
+      // Replace the '-an' flag with audio parameters for HKSV recording
       const anIndex = videoArgs.indexOf('-an')
       if (anIndex !== -1) {
+        // Replace -an with audio codec parameters
         videoArgs.splice(anIndex, 1, ...audioArgs)
+        this.log.debug(`HKSV: Enabled audio recording with codec parameters`, this.cameraName)
       }
+    } else {
+      this.log.debug(`HKSV: Audio disabled for recording`, this.cameraName)
     }
 
     // Get input configuration
     const ffmpegInput: Array<string> = []
-    if (this.videoConfig?.prebuffer) {
-      const input: Array<string> = this.preBuffer ? 
-        await this.preBuffer.getVideo(configuration.mediaContainerConfiguration.fragmentLength ?? PREBUFFER_LENGTH) : []
+    if (this.videoConfig?.prebuffer && this.preBuffer) {
+      this.log.debug(`HKSV: Using prebuffer for recording input`, this.cameraName)
+      const input: Array<string> = await this.preBuffer.getVideo(configuration.mediaContainerConfiguration.fragmentLength ?? PREBUFFER_LENGTH)
       ffmpegInput.push(...input)
     } else {
       if (!this.videoConfig?.source) {
         throw new Error('No video source configured')
       }
+      this.log.debug(`HKSV: Using direct source for recording input`, this.cameraName)
       ffmpegInput.push(...this.videoConfig.source.trim().split(/\s+/).filter(arg => arg.length > 0))
     }
     
@@ -338,12 +356,20 @@ export class RecordingDelegate implements CameraRecordingDelegate {
       throw new Error('No video source configured for recording')
     }
 
-    // Start FFmpeg session
-    const session = await this.startFFMPegFragmetedMP4Session(this.videoProcessor, ffmpegInput, videoArgs)
-    const { cp, generator } = session
-    
-    // Track process for cleanup
-    this.activeFFmpegProcesses.set(streamId, cp)
+    // Start FFmpeg session with enhanced error handling
+    let session, cp, generator
+    try {
+      session = await this.startFFMPegFragmetedMP4Session(this.videoProcessor, ffmpegInput, videoArgs)
+      cp = session.cp
+      generator = session.generator
+      
+      // Track process for cleanup
+      this.activeFFmpegProcesses.set(streamId, cp)
+      this.log.debug(`HKSV: FFmpeg process started for stream ${streamId}, PID: ${cp.pid}`, this.cameraName)
+    } catch (error) {
+      this.log.error(`HKSV: Failed to start FFmpeg session: ${error}`, this.cameraName)
+      throw new Error(`FFmpeg session startup failed: ${error}`)
+    }
 
     let pending: Array<Buffer> = []
     let isFirstFragment = true
