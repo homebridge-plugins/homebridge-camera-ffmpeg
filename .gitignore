@@ -41,3 +41,5 @@ dist
 
 # 
 *.DS_Store
+/tmp/*
+*.code-workspace
