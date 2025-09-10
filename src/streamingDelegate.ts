@@ -434,13 +434,27 @@ export class StreamingDelegate implements CameraStreamingDelegate {
         if (activeSession.timeout) {
           clearTimeout(activeSession.timeout)
         }
+        // Use a more conservative timeout to prevent premature stream termination
+        // Set minimum timeout to 30 seconds and maximum to 5 minutes
+        const baseTimeout = request.video.rtcp_interval * 5 * 1000
+        const timeout = Math.max(30000, Math.min(baseTimeout, 300000))
         activeSession.timeout = setTimeout(() => {
           this.log.info('Device appears to be inactive. Stopping stream.', this.cameraName)
           this.controller.forceStopStreamingSession(request.sessionID)
           this.stopStream(request.sessionID)
-        }, request.video.rtcp_interval * 5 * 1000)
+        }, timeout)
       })
       activeSession.socket.bind(sessionInfo.videoReturnPort)
+
+      // Set initial timeout in case RTCP messages are delayed
+      const baseTimeout = request.video.rtcp_interval * 5 * 1000
+      const timeout = Math.max(30000, Math.min(baseTimeout, 300000))
+      this.log.debug(`Setting stream timeout to ${timeout}ms (base: ${baseTimeout}ms, rtcp_interval: ${request.video.rtcp_interval}s)`, this.cameraName, this.videoConfig.debug)
+      activeSession.timeout = setTimeout(() => {
+        this.log.info('Device appears to be inactive. Stopping stream.', this.cameraName)
+        this.controller.forceStopStreamingSession(request.sessionID)
+        this.stopStream(request.sessionID)
+      }, timeout)
 
       activeSession.mainProcess = new FfmpegProcess(this.cameraName, request.sessionID, this.videoProcessor, ffmpegArgs, this.log, this.videoConfig.debug, this, callback)
 
