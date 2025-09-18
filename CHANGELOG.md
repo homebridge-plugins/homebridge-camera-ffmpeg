@@ -2,6 +2,18 @@
 
 All notable changes to this project will be documented in this file. This project uses [Semantic Versioning](https://semver.org/)
 
+## [4.0.2](https://github.com/homebridge-plugins/homebridge-camera-ffmpeg/releases/tag/v4.0.2) (2025-09-18)
+
+## What's Changed
+* Update Workflow by @Donavan Becker in https://github.com/homebridge-plugins/homebridge-camera-ffmpeg/commit/5712800
+* update dependencies by @Donavan Becker in https://github.com/homebridge-plugins/homebridge-camera-ffmpeg/commit/1c3eeec
+* Update Workflow by @Donavan Becker in https://github.com/homebridge-plugins/homebridge-camera-ffmpeg/commit/76139d0
+* Fix camera streaming timeout issue causing premature stream termination  by @Copilot in https://github.com/homebridge-plugins/homebridge-camera-ffmpeg/pull/1515
+* Fix HKSV recording stream closure with prebuffer integration and H.264 optimization  by @Copilot in https://github.com/homebridge-plugins/homebridge-camera-ffmpeg/pull/1511
+* Add tested configuration management to copilot instructions  by @Copilot in https://github.com/homebridge-plugins/homebridge-camera-ffmpeg/pull/1513
+
+**Full Changelog**: https://github.com/homebridge-plugins/homebridge-camera-ffmpeg/compare/v4.1.0-beta.2...v4.0.2
+
 ## [4.0.1](https://github.com/homebridge-plugins/homebridge-camera-ffmpeg/releases/tag/v4.0.1) (2025-03-04)
 
 ### What's Changes

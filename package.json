@@ -2,7 +2,7 @@
   "name": "@homebridge-plugins/homebridge-camera-ffmpeg",
   "displayName": "Homebridge Camera FFmpeg",
   "type": "module",
-  "version": "4.0.1",
+  "version": "4.0.2",
   "description": "Homebridge Plugin Providing FFmpeg-based Camera Support",
   "author": {
     "name": "Khaos Tian"
