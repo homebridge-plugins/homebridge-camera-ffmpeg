@@ -101,16 +101,35 @@ export class RecordingDelegate implements CameraRecordingDelegate {
     return Promise.resolve()
   }
 
-  updateRecordingConfiguration(): Promise<void> {
+  updateRecordingConfiguration(configuration: CameraRecordingConfiguration | undefined): void {
     this.log.info('Recording configuration updated', this.cameraName)
-    return Promise.resolve()
+    this.recordingConfiguration = configuration
   }
 
   async *handleRecordingStreamRequest(streamId: number): AsyncGenerator<RecordingPacket, any, any> {
     this.log.info(`Recording stream request received for stream ID: ${streamId}`, this.cameraName)
-    // Implement the logic to handle the recording stream request here
-    // For now, just yield an empty RecordingPacket
-    yield {} as RecordingPacket
+    
+    if (!this.recordingConfiguration) {
+      this.log.error('No recording configuration available', this.cameraName)
+      return
+    }
+
+    try {
+      for await (const fragmentData of this.handleFragmentsRequests(this.recordingConfiguration)) {
+        yield {
+          data: fragmentData,
+          isLast: false,
+        }
+      }
+    } catch (error) {
+      this.log.error(`Recording stream error: ${error}`, this.cameraName)
+    }
+    
+    // Always yield final packet to signal end of stream
+    yield {
+      data: Buffer.alloc(0),
+      isLast: true,
+    }
   }
 
   closeRecordingStream(streamId: number, reason: HDSProtocolSpecificErrorReason | undefined): void {
@@ -127,11 +146,13 @@ export class RecordingDelegate implements CameraRecordingDelegate {
   readonly controller?: CameraController
   private preBufferSession?: Mp4Session
   private preBuffer?: PreBuffer
+  private recordingConfiguration?: CameraRecordingConfiguration
 
   constructor(log: Logger, cameraName: string, videoConfig: VideoConfig, api: API, hap: HAP, videoProcessor?: string) {
     this.log = log
     this.hap = hap
     this.cameraName = cameraName
+    this.videoConfig = videoConfig
     this.videoProcessor = videoProcessor || ffmpegPathString || 'ffmpeg'
 
     api.on(APIEvent.SHUTDOWN, () => {
