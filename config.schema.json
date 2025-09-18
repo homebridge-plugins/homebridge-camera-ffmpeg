@@ -5,7 +5,7 @@
   "customUi": true,
   "customUiPath": "./dist/homebridge-ui",
   "headerDisplay": "Homebridge Plugin Providing FFmpeg-based Camera Support.",
-  "footerDisplay": "You can see configurations that have been shared by other users on [the project site](https://sunoo.github.io/homebridge-camera-ffmpeg/configs/).",
+  "footerDisplay": "You can see configurations that have been shared by other users on [the project site](https://homebridge-plugins.github.io/homebridge-camera-ffmpeg/configs/).",
   "schema": {
     "name": {
       "title": "Name",

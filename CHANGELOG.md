@@ -77,7 +77,7 @@ All notable changes to this project will be documented in this file. This projec
 
 ### What's Changes
 #### Breaking Changes
-- Complete rework of MQTT support. Now topics and messages are configurable per camera, which should allow any camera with MQTT support to work directly with this plugin. If you need compatibility with the way prior versions worked, you can follow [this config example](https://sunoo.github.io/homebridge-camera-ffmpeg/automation/mqtt.html#legacy-compatibility).
+- Complete rework of MQTT support. Now topics and messages are configurable per camera, which should allow any camera with MQTT support to work directly with this plugin. If you need compatibility with the way prior versions worked, you can follow [this config example](https://homebridge-plugins.github.io/homebridge-camera-ffmpeg/automation/mqtt.html#legacy-compatibility).
 - Dropped support for older versions of Homebridge, now requires version 1.1.3 or newer.
 
 #### Other Changes

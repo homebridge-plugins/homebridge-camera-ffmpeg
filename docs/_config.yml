@@ -1,0 +1,29 @@
+title: Homebridge Camera FFmpeg
+author: David Maher
+description: Homebridge Plugin Providing FFmpeg-based Camera Support
+baseurl: "/homebridge-camera-ffmpeg"
+url: "https://sunoo.github.io"
+github_username:  Sunoo
+
+markdown: CommonMarkGhPages
+theme: minima
+
+collections:
+  configs:
+    output: true
+  automation:
+    output: true
+
+defaults:
+  -
+    scope:
+      path: ""
+      type: "configs"
+    values:
+      layout: "config"
+  -
+    scope:
+      path: ""
+      type: "automation"
+    values:
+      layout: "page"

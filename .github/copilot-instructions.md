@@ -203,7 +203,7 @@ The plugin supports automation via:
 - **Switches**: HomeKit switches for manual triggering
 
 ### Tested Configuration Management
-The repository maintains a collection of tested camera configurations submitted by users via GitHub issues labeled "tested config". These configurations are displayed on the project documentation website at https://sunoo.github.io/homebridge-camera-ffmpeg/configs/.
+The repository maintains a collection of tested camera configurations submitted by users via GitHub issues labeled "tested config". These configurations are displayed on the project documentation website at https://homebridge-plugins.github.io/homebridge-camera-ffmpeg/configs/.
 
 #### Processing Tested Config Issues
 When working with issues that have the "tested config" label:
@@ -239,7 +239,7 @@ When working with issues that have the "tested config" label:
 - **Updates**: Update documentation links when adding new tested configurations
 
 #### Integration with Documentation Website
-The project uses a documentation website (sunoo.github.io/homebridge-camera-ffmpeg/) that includes:
+The project uses a documentation website (homebridge-plugins.github.io/homebridge-camera-ffmpeg/) that includes:
 - `/configs/` - Tested configuration repository
 - `/automation/mqtt.html` - MQTT automation documentation  
 - `/automation/http.html` - HTTP automation documentation

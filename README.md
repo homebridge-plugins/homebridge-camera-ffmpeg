@@ -1,6 +1,6 @@
 # Homebridge Camera FFmpeg
 
-[![npm](https://badgen.net/npm/v/homebridge-camera-ffmpeg) ![npm](https://badgen.net/npm/dt/homebridge-camera-ffmpeg)](https://www.npmjs.com/package/homebridge-camera-ffmpeg) [![verified-by-homebridge](https://badgen.net/badge/homebridge/verified/purple)](https://github.com/homebridge/homebridge/wiki/Verified-Plugins) [![certified-hoobs-plugin](https://badgen.net/badge/HOOBS/certified/yellow)](https://plugins.hoobs.org/plugin/homebridge-camera-ffmpeg)
+[![npm](https://badgen.net/npm/v/@homebridge-plugins/homebridge-camera-ffmpeg) ![npm](https://badgen.net/npm/dt/@homebridge-plugins/homebridge-camera-ffmpeg)](https://www.npmjs.com/package/@homebridge-plugins/homebridge-camera-ffmpeg) [![verified-by-homebridge](https://badgen.net/badge/homebridge/verified/purple)](https://github.com/homebridge/homebridge/wiki/Verified-Plugins) [![certified-hoobs-plugin](https://badgen.net/badge/HOOBS/certified/yellow)](https://plugins.hoobs.org/plugin/homebridge-camera-ffmpeg)
 
 [Homebridge](https://homebridge.io) Plugin Providing [FFmpeg](https://www.ffmpeg.org)-based Camera Support
 
@@ -15,7 +15,7 @@ This plugin is supported under both [Homebridge](https://homebridge.io) and [HOO
 
 ## Tested configurations
 
-Other users have been sharing configurations that work for them on our GitHub site. You may want to [check that](https://sunoo.github.io/homebridge-camera-ffmpeg/configs/) to see if anyone else has gotten your model of camera working already, or [share](https://github.com/homebridge-plugins/homebridge-camera-ffmpeg/issues/new?assignees=&labels=tested+config&template=tested_config.md) a configuration setup that works for you.
+Other users have been sharing configurations that work for them on our GitHub site. You may want to [check that](https://homebridge-plugins.github.io/homebridge-camera-ffmpeg/configs/) to see if anyone else has gotten your model of camera working already, or [share](https://github.com/homebridge-plugins/homebridge-camera-ffmpeg/issues/new?assignees=&labels=tested+config&template=tested_config.md) a configuration setup that works for you.
 
 ## Manual Configuration
 
@@ -49,9 +49,9 @@ Other users have been sharing configurations that work for them on our GitHub si
 
 ### Optional Parameters
 
-- `motion`: Exposes the motion sensor for this camera. This can be triggered with [dummy switches](https://sunoo.github.io/homebridge-camera-ffmpeg/automation/switch.html), [MQTT messages](https://sunoo.github.io/homebridge-camera-ffmpeg/automation/mqtt.html), or [via HTTP](https://sunoo.github.io/homebridge-camera-ffmpeg/automation/http.html), depending on what features are enabled in the config. (Default: `false`)
-- `doorbell`: Exposes the doorbell device for this camera. This can be triggered with [dummy switches](https://sunoo.github.io/homebridge-camera-ffmpeg/automation/switch.html), [MQTT messages](https://sunoo.github.io/homebridge-camera-ffmpeg/automation/mqtt.html), or [via HTTP](https://sunoo.github.io/homebridge-camera-ffmpeg/automation/http.html), depending on what features are enabled in the config. (Default: `false`)
-- `switches`: Enables dummy switches to trigger motion and/or doorbell, if either of those are enabled. When enabled there will be an additional switch that triggers the motion or doorbell event. See the project site for [more detailed instructions](https://sunoo.github.io/homebridge-camera-ffmpeg/automation/switch.html). (Default: `false`)
+- `motion`: Exposes the motion sensor for this camera. This can be triggered with [dummy switches](https://homebridge-plugins.github.io/homebridge-camera-ffmpeg/automation/switch.html), [MQTT messages](https://homebridge-plugins.github.io/homebridge-camera-ffmpeg/automation/mqtt.html), or [via HTTP](https://homebridge-plugins.github.io/homebridge-camera-ffmpeg/automation/http.html), depending on what features are enabled in the config. (Default: `false`)
+- `doorbell`: Exposes the doorbell device for this camera. This can be triggered with [dummy switches](https://homebridge-plugins.github.io/homebridge-camera-ffmpeg/automation/switch.html), [MQTT messages](https://homebridge-plugins.github.io/homebridge-camera-ffmpeg/automation/mqtt.html), or [via HTTP](https://homebridge-plugins.github.io/homebridge-camera-ffmpeg/automation/http.html), depending on what features are enabled in the config. (Default: `false`)
+- `switches`: Enables dummy switches to trigger motion and/or doorbell, if either of those are enabled. When enabled there will be an additional switch that triggers the motion or doorbell event. See the project site for [more detailed instructions](https://homebridge-plugins.github.io/homebridge-camera-ffmpeg/automation/switch.html). (Default: `false`)
 - `motionTimeout`: The number of seconds after triggering to reset the motion sensor. Set to 0 to disable resetting of motion trigger for MQTT or HTTP. (Default: `1`)
 - `motionDoorbell`: Rings the doorbell when motion is activated. This allows for motion alerts to appear on Apple TVs. (Default: `false`)
 - `manufacturer`: Set the manufacturer name for display in the Home app. (Default: `Homebridge`)
@@ -167,12 +167,12 @@ Other users have been sharing configurations that work for them on our GitHub si
 
 ### Automation Parameters
 
-- `mqtt`: Defines the hostname or IP of the MQTT broker to connect to for MQTT-based automation. If not set, MQTT support is not started. See the project site for [more information on using MQTT](https://sunoo.github.io/homebridge-camera-ffmpeg/automation/mqtt.html).
+- `mqtt`: Defines the hostname or IP of the MQTT broker to connect to for MQTT-based automation. If not set, MQTT support is not started. See the project site for [more information on using MQTT](https://homebridge-plugins.github.io/homebridge-camera-ffmpeg/automation/mqtt.html).
 - `portmqtt`: The port of the MQTT broker. (Default: `1883`)
 - `tlsmqtt`: Use TLS to connect to the MQTT broker. (Default: `false`)
 - `usermqtt`: The username used to connect to your MQTT broker. If not set, no authentication is used.
 - `passmqtt`: The password used to connect to your MQTT broker. If not set, no authentication is used.
-- `porthttp`: The port to listen on for HTTP-based automation. If not set, HTTP support is not started. See the project site for [more information on using HTTP](https://sunoo.github.io/homebridge-camera-ffmpeg/automation/http.html).
+- `porthttp`: The port to listen on for HTTP-based automation. If not set, HTTP support is not started. See the project site for [more information on using HTTP](https://homebridge-plugins.github.io/homebridge-camera-ffmpeg/automation/http.html).
 - `localhttp`: Only allow HTTP calls from localhost. Useful if using helper plugins that translate to HTTP. (Default: `false`)
 
 #### Automation Example

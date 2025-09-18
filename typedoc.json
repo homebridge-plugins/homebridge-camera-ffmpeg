@@ -1,0 +1,17 @@
+{
+  "out": "docs",
+  "exclude": ["src/**/*.spec.ts"],
+  "entryPoints": [
+    "src/index.ts"
+  ],
+  "excludePrivate": true,
+  "excludeProtected": true,
+  "excludeExternals": true,
+  "hideGenerator": true,
+  "includeVersion": false,
+  "validation": {
+    "invalidLink": true,
+    "notExported": false
+  },
+  "inlineTags": ["@link", "@see"]
+}

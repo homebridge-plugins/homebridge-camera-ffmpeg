@@ -75,12 +75,14 @@
     "watch": "npm run build && npm run plugin-ui && npm link && nodemon",
     "plugin-ui": "rsync ./src/homebridge-ui/public/index.html ./dist/homebridge-ui/public/",
     "build": "npm run clean && tsc && npm run plugin-ui",
-    "prepublishOnly": "npm run lint && npm run build && npm run plugin-ui",
+    "prepublishOnly": "npm run lint && npm run build && npm run plugin-ui && npm run docs && npm run docs:lint",
     "postpublish": "npm run clean && npm ci",
     "clean": "shx rm -rf ./dist",
     "test": "vitest run",
     "test:watch": "vitest watch",
-    "test-coverage": "npm run test -- --coverage"
+    "test-coverage": "npm run test -- --coverage",
+    "docs": "typedoc",
+    "docs:lint": "typedoc --emit none --treatWarningsAsErrors"
   },
   "dependencies": {
     "@homebridge/camera-utils": "^3.0.0",
