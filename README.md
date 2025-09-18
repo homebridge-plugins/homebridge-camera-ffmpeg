@@ -15,7 +15,12 @@ This plugin is supported under both [Homebridge](https://homebridge.io) and [HOO
 
 ## Tested configurations
 
-Other users have been sharing configurations that work for them on our GitHub site. You may want to [check that](https://sunoo.github.io/homebridge-camera-ffmpeg/configs/) to see if anyone else has gotten your model of camera working already, or [share](https://github.com/homebridge-plugins/homebridge-camera-ffmpeg/issues/new?assignees=&labels=tested+config&template=tested_config.md) a configuration setup that works for you.
+Other users have been sharing configurations that work for them. You can find tested configurations in several places:
+
+- **[Local Documentation](./docs/)** - Tested configurations maintained within this repository
+- **[Project Site](https://sunoo.github.io/homebridge-camera-ffmpeg/configs/)** - Additional configurations shared by the community
+
+If you have a working configuration for a camera model not yet documented, please [share it](https://github.com/homebridge-plugins/homebridge-camera-ffmpeg/issues/new?assignees=&labels=tested+config&template=tested_config.md) so others can benefit from your setup.
 
 ## Manual Configuration
 
