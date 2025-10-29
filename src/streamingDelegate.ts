@@ -6,6 +6,8 @@ import type { Logger } from './logger.js'
 import { Buffer } from 'node:buffer'
 import { spawn } from 'node:child_process'
 import { createSocket, Socket } from 'node:dgram'
+import http from 'node:http'
+import https from 'node:https'
 import { env } from 'node:process'
 
 import { defaultFfmpegPath } from '@homebridge/camera-utils'
@@ -193,53 +195,113 @@ export class StreamingDelegate implements CameraStreamingDelegate {
   fetchSnapshot(snapFilter?: string): Promise<Buffer> {
     this.snapshotPromise = new Promise((resolve, reject) => {
       const startTime = Date.now()
-      const ffmpegArgs = `${this.videoConfig.stillImageSource || this.videoConfig.source! // Still
-      } -frames:v 1${snapFilter ? ` -filter:v ${snapFilter}` : ''
-      } -f image2 -`
-      + ` -hide_banner`
-      + ` -loglevel error`
+      const source = this.videoConfig.stillImageSource || this.videoConfig.source!
 
-      this.log.debug(`Snapshot command: ${this.videoProcessor} ${ffmpegArgs}`, this.cameraName, this.videoConfig.debug)
-      const ffmpeg = spawn(this.videoProcessor, ffmpegArgs.split(/\s+/), { env })
+      // Check if source is a direct HTTP/HTTPS URL (not FFmpeg args)
+      // A direct URL doesn't contain spaces and starts with http:// or https://
+      const isDirectUrl = /^https?:\/\/[^\s]+$/.test(source.trim())
 
-      let snapshotBuffer = Buffer.alloc(0)
-      ffmpeg.stdout.on('data', (data) => {
-        snapshotBuffer = Buffer.concat([snapshotBuffer, data])
-      })
-      ffmpeg.on('error', (error: Error) => {
-        reject(new Error(`FFmpeg process creation failed: ${error.message}`))
-      })
-      ffmpeg.stderr.on('data', (data) => {
-        data.toString().split('\n').forEach((line: string) => {
-          if (this.videoConfig.debug && line.length > 0) { // For now only write anything out when debug is set
-            this.log.error(line, `${this.cameraName}] [Snapshot`)
+      if (isDirectUrl) {
+        // Direct HTTP/HTTPS fetch - much faster and more efficient
+        this.log.debug(`Fetching snapshot via HTTP: ${source}`, this.cameraName, this.videoConfig.debug)
+        const client = source.startsWith('https') ? https : http
+
+        const req = client.get(source, { timeout: 10000 }, (res) => {
+          if (res.statusCode !== 200) {
+            reject(new Error(`Failed to fetch snapshot, HTTP status: ${res.statusCode}`))
+            res.resume()
+            return
+          }
+
+          const chunks: Buffer[] = []
+          res.on('data', (chunk) => {
+            chunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk))
+          })
+
+          res.on('end', () => {
+            const snapshotBuffer = Buffer.concat(chunks)
+            if (snapshotBuffer.length > 0) {
+              resolve(snapshotBuffer)
+            } else {
+              reject(new Error('Failed to fetch snapshot: empty response'))
+            }
+
+            setTimeout(() => {
+              this.snapshotPromise = undefined
+            }, 3 * 1000) // Expire cached snapshot after 3 seconds
+
+            const runtime = (Date.now() - startTime) / 1000
+            let message = `Fetching snapshot took ${runtime} seconds.`
+            if (runtime < 5) {
+              this.log.debug(message, this.cameraName, this.videoConfig.debug)
+            } else {
+              if (runtime < 22) {
+                this.log.warn(message, this.cameraName)
+              } else {
+                message += ' The request has timed out and the snapshot has not been refreshed in HomeKit.'
+                this.log.error(message, this.cameraName)
+              }
+            }
+          })
+        })
+
+        req.on('error', (err) => {
+          reject(new Error(`HTTP snapshot error: ${err.message}`))
+        })
+
+        req.on('timeout', () => {
+          req.destroy()
+          reject(new Error('HTTP snapshot request timed out'))
+        })
+      } else {
+        // Use FFmpeg for RTSP streams, FFmpeg args, or when filters are needed
+        const ffmpegArgs = `${source} -frames:v 1${snapFilter ? ` -filter:v ${snapFilter}` : ''
+        } -f image2 -`
+        + ` -hide_banner`
+        + ` -loglevel error`
+
+        this.log.debug(`Snapshot command: ${this.videoProcessor} ${ffmpegArgs}`, this.cameraName, this.videoConfig.debug)
+        const ffmpeg = spawn(this.videoProcessor, ffmpegArgs.split(/\s+/), { env })
+
+        let snapshotBuffer = Buffer.alloc(0)
+        ffmpeg.stdout.on('data', (data) => {
+          snapshotBuffer = Buffer.concat([snapshotBuffer, data])
+        })
+        ffmpeg.on('error', (error: Error) => {
+          reject(new Error(`FFmpeg process creation failed: ${error.message}`))
+        })
+        ffmpeg.stderr.on('data', (data) => {
+          data.toString().split('\n').forEach((line: string) => {
+            if (this.videoConfig.debug && line.length > 0) {
+              this.log.error(line, `${this.cameraName}] [Snapshot`)
+            }
+          })
+        })
+        ffmpeg.on('close', () => {
+          if (snapshotBuffer.length > 0) {
+            resolve(snapshotBuffer)
+          } else {
+            reject(new Error('Failed to fetch snapshot.'))
+          }
+
+          setTimeout(() => {
+            this.snapshotPromise = undefined
+          }, 3 * 1000) // Expire cached snapshot after 3 seconds
+
+          const runtime = (Date.now() - startTime) / 1000
+          let message = `Fetching snapshot took ${runtime} seconds.`
+          if (runtime < 5) {
+            this.log.debug(message, this.cameraName, this.videoConfig.debug)
+          } else {
+            if (runtime < 22) {
+              this.log.warn(message, this.cameraName)
+            } else {
+              message += ' The request has timed out and the snapshot has not been refreshed in HomeKit.'
+              this.log.error(message, this.cameraName)
+            }
           }
         })
-      })
-      ffmpeg.on('close', () => {
-        if (snapshotBuffer.length > 0) {
-          resolve(snapshotBuffer)
-        } else {
-          reject(new Error('Failed to fetch snapshot.'))
-        }
-
-        setTimeout(() => {
-          this.snapshotPromise = undefined
-        }, 3 * 1000) // Expire cached snapshot after 3 seconds
-
-        const runtime = (Date.now() - startTime) / 1000
-        let message = `Fetching snapshot took ${runtime} seconds.`
-        if (runtime < 5) {
-          this.log.debug(message, this.cameraName, this.videoConfig.debug)
-        } else {
-          if (runtime < 22) {
-            this.log.warn(message, this.cameraName)
-          } else {
-            message += ' The request has timed out and the snapshot has not been refreshed in HomeKit.'
-            this.log.error(message, this.cameraName)
-          }
-        }
-      })
+      }
     })
     return this.snapshotPromise
   }
