@@ -54,9 +54,16 @@ export class FfmpegPlatform implements DynamicPlatformPlugin {
           }
         }
         if (cameraConfig.videoConfig.stillImageSource) {
-          const stillArgs = cameraConfig.videoConfig.stillImageSource.split(/\s+/)
-          if (!stillArgs.includes('-i')) {
-            this.log.warn('The stillImageSource for this camera is missing "-i", it is likely misconfigured.', cameraConfig.name)
+          const stillSource = cameraConfig.videoConfig.stillImageSource.trim()
+          // Check if it's a direct HTTP/HTTPS URL (doesn't need -i)
+          const isDirectUrl = /^https?:\/\/[^\s]+$/.test(stillSource)
+
+          if (!isDirectUrl) {
+            // Only validate FFmpeg-style sources
+            const stillArgs = stillSource.split(/\s+/)
+            if (!stillArgs.includes('-i')) {
+              this.log.warn('The stillImageSource for this camera is missing "-i", it is likely misconfigured.', cameraConfig.name)
+            }
           }
         }
         if (cameraConfig.videoConfig.vcodec === 'copy' && cameraConfig.videoConfig.videoFilter) {
