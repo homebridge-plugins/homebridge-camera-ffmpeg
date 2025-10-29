@@ -84,8 +84,17 @@ Cameras are configured in the platform config with these key sections:
 - `videoConfig.source` - FFmpeg input arguments (required, must include `-i`)
 - `videoConfig.subSource` - Lower resolution stream for motion detection
 - `videoConfig.stillImageSource` - Direct URL or FFmpeg source for snapshots
+  - HTTP/HTTPS URLs: `"http://camera.local/snapshot.jpg"` (no `-i` needed)
+  - FFmpeg sources: `"-i rtsp://camera.local:554/stream"` (requires `-i`)
 - `videoConfig.recording` - Enables HomeKit Secure Video
 - `videoConfig.prebuffer` - Enables video prebuffering for HSV (requires recording)
+
+### Configuration Validation
+The plugin validates camera configurations at startup (platform.ts constructor):
+- Checks for required fields (name, source)
+- Validates FFmpeg arguments include `-i` flag
+- **Intelligently skips `-i` validation** for direct HTTP/HTTPS URLs in `stillImageSource`
+- Uses the same URL detection regex as snapshot fetching (`/^https?:\/\/[^\s]+$/`)
 
 ### FFmpeg Path Resolution
 The plugin uses this hierarchy for finding FFmpeg:
