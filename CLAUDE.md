@@ -56,11 +56,11 @@ The project uses Vitest for testing. Test files are excluded from the TypeScript
 - Provides video segments on-demand when recording is triggered
 
 **FFmpeg Process (ffmpeg.ts)**
-- Wrapper around FFmpeg child processes
+- Wrapper around FFmpeg child processes for video streaming
 - Parses progress output for monitoring
 - Handles process lifecycle (start, stop, error handling)
-- Supports motion detection via scene change analysis
 - Logs performance metrics and errors
+- Note: Motion detection FFmpeg processes are managed directly by Platform
 
 ### Data Flow
 
@@ -82,7 +82,10 @@ The project uses Vitest for testing. Test files are excluded from the TypeScript
 ### Camera Configuration Structure
 Cameras are configured in the platform config with these key sections:
 - `videoConfig.source` - FFmpeg input arguments (required, must include `-i`)
-- `videoConfig.subSource` - Lower resolution stream for motion detection
+  - Example: `"-rtsp_transport tcp -i rtsp://camera.local:554/stream0"`
+- `videoConfig.subSource` - FFmpeg input arguments for lower resolution stream (for motion detection)
+  - Same syntax as `source` (must include `-i`)
+  - Example: `"-rtsp_transport tcp -i rtsp://camera.local:554/stream1"`
 - `videoConfig.stillImageSource` - Direct URL or FFmpeg source for snapshots
   - HTTP/HTTPS URLs: `"http://camera.local/snapshot.jpg"` (no `-i` needed)
   - FFmpeg sources: `"-i rtsp://camera.local:554/stream"` (requires `-i`)
@@ -113,7 +116,7 @@ The plugin uses this hierarchy for finding FFmpeg:
 ### Adding Features
 - Camera features require updates to: settings.ts (types), config.schema.json (UI), platform.ts or streamingDelegate.ts (logic)
 - HSV features primarily live in recordingDelegate.ts and prebuffer.ts
-- Motion/doorbell automation touches platform.ts event handlers and ffmpeg.ts for detection
+- Motion/doorbell automation and FFmpeg-based motion detection live in platform.ts event handlers
 
 ### Snapshot Fetching
 The plugin intelligently chooses between two methods for fetching snapshots:
@@ -161,8 +164,33 @@ The plugin supports automatic motion detection by analyzing the video stream:
 
 **Requirements**
 - `motion: true` must be enabled (creates the motion sensor)
-- `videoConfig.subSource` must be configured
+- `videoConfig.subSource` must be configured with FFmpeg arguments
 - Camera must provide a sub stream URL
+
+**Complete Configuration Example**
+```json
+{
+  "name": "Front Camera",
+  "motion": true,
+  "ffmpegMotionDetection": true,
+  "ffmpegMotionSensitivity": 0.04,
+  "motionTimeout": 15,
+  "videoConfig": {
+    "source": "-rtsp_transport tcp -i rtsp://camera.local:554/stream0",
+    "subSource": "-rtsp_transport tcp -i rtsp://camera.local:554/stream1",
+    "stillImageSource": "http://camera.local/snapshot.jpg",
+    "recording": true,
+    "prebuffer": true
+  }
+}
+```
+
+**Important Notes**
+- `subSource` uses the same syntax as `source` (full FFmpeg arguments)
+- Stream 0 is typically the main/high-resolution stream
+- Stream 1 is typically the sub/low-resolution stream
+- The sub stream should be lower resolution to reduce CPU usage during motion analysis
+- Motion detection runs continuously and independently from HomeKit streaming
 
 ### FFmpeg Integration
 - All FFmpeg commands are split by whitespace and passed as argv arrays
