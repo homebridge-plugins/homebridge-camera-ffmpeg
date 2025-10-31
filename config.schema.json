@@ -146,8 +146,8 @@
               "subSource": {
                 "title": "Sub Stream Source (for Motion Detection)",
                 "type": "string",
-                "placeholder": "rtsp://username:password@example.com:554/sub",
-                "description": "A lower resolution stream URL for FFmpeg motion detection. Using a sub stream reduces CPU usage. Required if FFmpeg Motion Detection is enabled."
+                "placeholder": "-rtsp_transport tcp -i rtsp://username:password@example.com:554/sub",
+                "description": "FFmpeg options for a lower resolution stream used for motion detection. Same syntax as 'source'. Using a sub stream reduces CPU usage. Required if FFmpeg Motion Detection is enabled."
               },
               "stillImageSource": {
                 "title": "Still Image Source",

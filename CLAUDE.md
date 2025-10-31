@@ -147,8 +147,8 @@ The plugin supports automatic motion detection by analyzing the video stream:
 - `ffmpegMotionSensitivity` (number, 0.01-0.1) - Threshold for scene changes (default: 0.03)
   - Lower values = more sensitive
   - Higher values = less sensitive
-- `videoConfig.subSource` (string) - Direct RTSP URL for motion analysis
-  - Example: `"rtsp://camera.local:554/sub"` (no `-i` prefix needed)
+- `videoConfig.subSource` (string) - FFmpeg arguments for motion analysis stream
+  - Same syntax as `source` (e.g., `"-rtsp_transport tcp -i rtsp://camera.local:554/sub"`)
   - Should be a lower resolution stream than main source
 - `motionTimeout` (seconds) - Reused for motion cooldown period (default: 15)
 

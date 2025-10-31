@@ -5,7 +5,6 @@ import type { StreamRequestCallback } from 'homebridge'
 
 import type { Logger } from './logger.js'
 import type { StreamingDelegate } from './streamingDelegate.js'
-import type { CameraConfig } from './settings.js'
 
 import { spawn } from 'node:child_process'
 import os from 'node:os'
@@ -17,9 +16,6 @@ export class FfmpegProcess {
   private readonly process: ChildProcessWithoutNullStreams
   private killTimeout?: NodeJS.Timeout
   readonly stdin: Writable
-  private motionProcess?: ChildProcessWithoutNullStreams
-  private lastMotionTime?: number
-  private motionRestartTimeout?: NodeJS.Timeout
 
   constructor(cameraName: string, sessionId: string, videoProcessor: string, ffmpegArgs: string, log: Logger, debug = false, delegate: StreamingDelegate, callback?: StreamRequestCallback) {
     log.debug(`Stream command: ${videoProcessor} ${ffmpegArgs}`, cameraName, debug)
@@ -132,93 +128,5 @@ export class FfmpegProcess {
     this.killTimeout = setTimeout(() => {
       this.process.kill('SIGKILL')
     }, 2 * 1000)
-  }
-
-  public startMotionDetection(
-    cameraName: string,
-    cameraConfig: CameraConfig,
-    videoProcessor: string,
-    log: Logger,
-    motionDetectedCallback: () => void
-  ): void {
-    if (!cameraConfig.videoConfig?.subSource) {
-      log.error('FFmpeg motion detection requires subSource to be configured', cameraName)
-      return
-    }
-
-    const subSource = cameraConfig.videoConfig.subSource
-    const cooldownSeconds = cameraConfig.motionTimeout ?? 15
-    const sensitivityThreshold = cameraConfig.ffmpegMotionSensitivity ?? 0.03
-
-    log.info(
-      `Starting FFmpeg motion detection (sensitivity: ${sensitivityThreshold}, cooldown: ${cooldownSeconds}s)`,
-      cameraName
-    )
-
-    const motionArgs = [
-      '-hide_banner',
-      '-loglevel',
-      'info',
-      '-rtsp_transport',
-      'tcp',
-      '-i',
-      subSource,
-      '-vf',
-      `select='gt(scene,${sensitivityThreshold})',metadata=print`,
-      '-an',
-      '-f',
-      'null',
-      '-',
-    ]
-
-    this.motionProcess = spawn(videoProcessor, motionArgs, { env })
-
-    const stderr = readline.createInterface({
-      input: this.motionProcess.stderr,
-      terminal: false,
-    })
-
-    stderr.on('line', (line: string) => {
-      const match = line.match(/scene_score=([0-9.]+)/)
-      if (match) {
-        const score = Number.parseFloat(match[1])
-        if (score > sensitivityThreshold) {
-          const now = Date.now()
-          if (!this.lastMotionTime || now - this.lastMotionTime > cooldownSeconds * 1000) {
-            this.lastMotionTime = now
-            log.info(`Motion detected (score: ${score.toFixed(4)})`, cameraName)
-            motionDetectedCallback()
-          }
-        }
-      }
-    })
-
-    this.motionProcess.on('error', (error: Error) => {
-      log.error(`FFmpeg motion detection process error: ${error.message}`, cameraName)
-    })
-
-    this.motionProcess.on('close', (code: number) => {
-      log.warn(`FFmpeg motion detection exited with code ${code}, restarting in 10 seconds...`, cameraName)
-
-      if (this.motionRestartTimeout) {
-        clearTimeout(this.motionRestartTimeout)
-      }
-
-      this.motionRestartTimeout = setTimeout(() => {
-        this.startMotionDetection(cameraName, cameraConfig, videoProcessor, log, motionDetectedCallback)
-      }, 10000)
-    })
-  }
-
-  public stopMotionDetection(): void {
-    if (this.motionRestartTimeout) {
-      clearTimeout(this.motionRestartTimeout)
-      this.motionRestartTimeout = undefined
-    }
-
-    if (this.motionProcess) {
-      this.motionProcess.kill('SIGTERM')
-      this.motionProcess = undefined
-    }
   }
 }

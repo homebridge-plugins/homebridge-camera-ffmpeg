@@ -366,7 +366,7 @@ export class FfmpegPlatform implements DynamicPlatformPlugin {
       return
     }
 
-    const subSource = cameraConfig.videoConfig.subSource
+    const subSourceArgs = cameraConfig.videoConfig.subSource.split(/\s+/)
     const cooldownSeconds = cameraConfig.motionTimeout ?? 15
     const sensitivityThreshold = cameraConfig.ffmpegMotionSensitivity ?? 0.03
     const videoProcessor = this.config.videoProcessor || 'ffmpeg'
@@ -380,10 +380,7 @@ export class FfmpegPlatform implements DynamicPlatformPlugin {
       '-hide_banner',
       '-loglevel',
       'info',
-      '-rtsp_transport',
-      'tcp',
-      '-i',
-      subSource,
+      ...subSourceArgs,
       '-vf',
       `select='gt(scene,${sensitivityThreshold})',metadata=print`,
       '-an',
