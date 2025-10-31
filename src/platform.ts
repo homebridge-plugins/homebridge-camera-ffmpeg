@@ -1,4 +1,5 @@
 import type { Buffer } from 'node:buffer'
+import type { ChildProcessWithoutNullStreams } from 'node:child_process'
 
 import type { API, CharacteristicSetCallback, CharacteristicValue, DynamicPlatformPlugin, Logging, PlatformAccessory, PlatformConfig } from 'homebridge'
 
@@ -6,6 +7,9 @@ import type { AutomationReturn } from "./settings.js"
 import type { CameraConfig, FfmpegPlatformConfig } from './settings.js'
 
 import http from 'node:http'
+import { spawn } from 'node:child_process'
+import { env } from 'node:process'
+import readline from 'node:readline'
 
 import { APIEvent, CharacteristicEventTypes, PlatformAccessoryEvent } from 'homebridge'
 import mqtt from 'mqtt'
@@ -15,6 +19,12 @@ import { StreamingDelegate } from './streamingDelegate.js'
 import { PLUGIN_NAME, PLATFORM_NAME, MqttAction, getVersion } from './settings.js'
 
 const version = getVersion()
+
+interface MotionDetectionInfo {
+  process: ChildProcessWithoutNullStreams
+  restartTimeout?: NodeJS.Timeout
+  lastMotionTime?: number
+}
 
 export class FfmpegPlatform implements DynamicPlatformPlugin {
   private readonly log: Logger
@@ -26,6 +36,7 @@ export class FfmpegPlatform implements DynamicPlatformPlugin {
   private readonly motionTimers: Map<string, NodeJS.Timeout> = new Map()
   private readonly doorbellTimers: Map<string, NodeJS.Timeout> = new Map()
   private readonly mqttActions: Map<string, Map<string, Array<MqttAction>>> = new Map()
+  private readonly motionDetectionProcesses: Map<string, MotionDetectionInfo> = new Map()
 
   constructor(log: Logging, config: PlatformConfig, api: API) {
     this.log = new Logger(log)
@@ -54,9 +65,16 @@ export class FfmpegPlatform implements DynamicPlatformPlugin {
           }
         }
         if (cameraConfig.videoConfig.stillImageSource) {
-          const stillArgs = cameraConfig.videoConfig.stillImageSource.split(/\s+/)
-          if (!stillArgs.includes('-i')) {
-            this.log.warn('The stillImageSource for this camera is missing "-i", it is likely misconfigured.', cameraConfig.name)
+          const stillSource = cameraConfig.videoConfig.stillImageSource.trim()
+          // Check if it's a direct HTTP/HTTPS URL (doesn't need -i)
+          const isDirectUrl = /^https?:\/\/[^\s]+$/.test(stillSource)
+
+          if (!isDirectUrl) {
+            // Only validate FFmpeg-style sources
+            const stillArgs = stillSource.split(/\s+/)
+            if (!stillArgs.includes('-i')) {
+              this.log.warn('The stillImageSource for this camera is missing "-i", it is likely misconfigured.', cameraConfig.name)
+            }
           }
         }
         if (cameraConfig.videoConfig.vcodec === 'copy' && cameraConfig.videoConfig.videoFilter) {
@@ -151,6 +169,11 @@ export class FfmpegPlatform implements DynamicPlatformPlugin {
             callback()
           })
         accessory.addService(motionTrigger)
+      }
+
+      // Setup FFmpeg-based motion detection if enabled
+      if (cameraConfig.ffmpegMotionDetection && cameraConfig.videoConfig?.subSource) {
+        this.startMotionDetection(accessory, cameraConfig)
       }
     }
 
@@ -334,6 +357,94 @@ export class FfmpegPlatform implements DynamicPlatformPlugin {
         error: true,
         message: `Camera "${name}" not found.`,
       }
+    }
+  }
+
+  private startMotionDetection(accessory: PlatformAccessory, cameraConfig: CameraConfig): void {
+    if (!cameraConfig.videoConfig?.subSource) {
+      this.log.error('FFmpeg motion detection requires subSource to be configured', cameraConfig.name)
+      return
+    }
+
+    const subSourceArgs = cameraConfig.videoConfig.subSource.split(/\s+/)
+    const cooldownSeconds = cameraConfig.motionTimeout ?? 15
+    const sensitivityThreshold = cameraConfig.ffmpegMotionSensitivity ?? 0.03
+    const videoProcessor = this.config.videoProcessor || 'ffmpeg'
+
+    this.log.info(
+      `Starting FFmpeg motion detection (sensitivity: ${sensitivityThreshold}, cooldown: ${cooldownSeconds}s)`,
+      cameraConfig.name
+    )
+
+    const motionArgs = [
+      '-hide_banner',
+      '-loglevel',
+      'info',
+      ...subSourceArgs,
+      '-vf',
+      `select='gt(scene,${sensitivityThreshold})',metadata=print`,
+      '-an',
+      '-f',
+      'null',
+      '-',
+    ]
+
+    const motionProcess = spawn(videoProcessor, motionArgs, { env })
+
+    const stderr = readline.createInterface({
+      input: motionProcess.stderr,
+      terminal: false,
+    })
+
+    stderr.on('line', (line: string) => {
+      const match = line.match(/scene_score=([0-9.]+)/)
+      if (match) {
+        const score = Number.parseFloat(match[1])
+        if (score > sensitivityThreshold) {
+          const now = Date.now()
+          const info = this.motionDetectionProcesses.get(accessory.UUID)
+          if (info && (!info.lastMotionTime || now - info.lastMotionTime > cooldownSeconds * 1000)) {
+            info.lastMotionTime = now
+            this.log.info(`Motion detected (score: ${score.toFixed(4)})`, cameraConfig.name)
+            this.motionHandler(accessory, true)
+          }
+        }
+      }
+    })
+
+    motionProcess.on('error', (error: Error) => {
+      this.log.error(`FFmpeg motion detection process error: ${error.message}`, cameraConfig.name)
+    })
+
+    motionProcess.on('close', (code: number) => {
+      this.log.warn(`FFmpeg motion detection exited with code ${code}, restarting in 10 seconds...`, cameraConfig.name)
+
+      const info = this.motionDetectionProcesses.get(accessory.UUID)
+      if (info) {
+        if (info.restartTimeout) {
+          clearTimeout(info.restartTimeout)
+        }
+
+        info.restartTimeout = setTimeout(() => {
+          this.motionDetectionProcesses.delete(accessory.UUID)
+          this.startMotionDetection(accessory, cameraConfig)
+        }, 10000)
+      }
+    })
+
+    this.motionDetectionProcesses.set(accessory.UUID, {
+      process: motionProcess,
+    })
+  }
+
+  private stopMotionDetection(accessory: PlatformAccessory): void {
+    const info = this.motionDetectionProcesses.get(accessory.UUID)
+    if (info) {
+      if (info.restartTimeout) {
+        clearTimeout(info.restartTimeout)
+      }
+      info.process.kill('SIGTERM')
+      this.motionDetectionProcesses.delete(accessory.UUID)
     }
   }
 

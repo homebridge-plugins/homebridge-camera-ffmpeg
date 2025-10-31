@@ -24,7 +24,11 @@ Other users have been sharing configurations that work for them on our GitHub si
 - `platform`: _(Required)_ Must always be set to `Camera-ffmpeg`.
 - `name`: _(Required)_ Set the camera name for display in the Home app.
 - `source`: _(Required)_ FFmpeg options on where to find and how to decode your camera's video stream. The most basic form is `-i` followed by your camera's URL.
-- `stillImageSource`: If your camera also provides a URL for a still image, that can be defined here with the same syntax as `source`. If not set, the plugin will grab one frame from `source`.
+- `subSource`: FFmpeg options for a lower resolution stream. Uses the same syntax as `source` (e.g., `-rtsp_transport tcp -i rtsp://camera.local:554/stream1`). **Required if you want to use `ffmpegMotionDetection`** - without this, automatic motion detection will not work. Should point to your camera's sub/low-resolution stream to reduce CPU usage.
+- `stillImageSource`: If your camera provides a snapshot URL, you can define it here. Supports two formats:
+  - **Direct URL** (recommended, faster): `http://camera.local/snapshot.jpg` - fetches images directly via HTTP/HTTPS
+  - **FFmpeg source**: `-i rtsp://camera.local:554/stream` - uses FFmpeg to extract a frame (required for RTSP or when filters are needed)
+  - If not set, the plugin will grab one frame from `source`.
 
 #### Config Example
 
@@ -35,8 +39,9 @@ Other users have been sharing configurations that work for them on our GitHub si
     {
       "name": "Camera Name",
       "videoConfig": {
-        "source": "-i rtsp://username:password@example.com:554",
-        "stillImageSource": "-i http://example.com/still_image.jpg",
+        "source": "-i rtsp://username:password@example.com:554/stream0",
+        "subSource": "-i rtsp://username:password@example.com:554/stream1",
+        "stillImageSource": "http://example.com/snapshot.jpg",
         "maxStreams": 2,
         "maxWidth": 1280,
         "maxHeight": 720,
@@ -54,6 +59,8 @@ Other users have been sharing configurations that work for them on our GitHub si
 - `switches`: Enables dummy switches to trigger motion and/or doorbell, if either of those are enabled. When enabled there will be an additional switch that triggers the motion or doorbell event. See the project site for [more detailed instructions](https://homebridge-plugins.github.io/homebridge-camera-ffmpeg/automation/switch.html). (Default: `false`)
 - `motionTimeout`: The number of seconds after triggering to reset the motion sensor. Set to 0 to disable resetting of motion trigger for MQTT or HTTP. (Default: `1`)
 - `motionDoorbell`: Rings the doorbell when motion is activated. This allows for motion alerts to appear on Apple TVs. (Default: `false`)
+- `ffmpegMotionDetection`: Enables automatic motion detection by analyzing the video stream using FFmpeg scene change detection. Requires `motion` to be enabled and `subSource` to be configured in `videoConfig`. (Default: `false`)
+- `ffmpegMotionSensitivity`: Sensitivity threshold for FFmpeg motion detection. Lower values are more sensitive (range: 0.01-0.1). (Default: `0.03`)
 - `manufacturer`: Set the manufacturer name for display in the Home app. (Default: `Homebridge`)
 - `model`: Set the model for display in the Home app. (Default: `Camera FFmpeg`)
 - `serialNumber`: Set the serial number for display in the Home app. (Default: `SerialNumber`)
@@ -164,6 +171,59 @@ Other users have been sharing configurations that work for them on our GitHub si
   ]
 }
 ```
+
+### FFmpeg Motion Detection
+
+This plugin supports automatic motion detection by analyzing the video stream using FFmpeg's scene change detection filter. This eliminates the need for external motion detection systems or camera motion events.
+
+#### How It Works
+
+- Uses FFmpeg's `scene` filter to detect significant changes in the video
+- Analyzes a lower-resolution stream (`subSource`) to reduce CPU usage
+- Automatically triggers the HomeKit motion sensor when motion is detected
+- Includes configurable sensitivity and cooldown periods
+
+#### Requirements
+
+- `motion` must be enabled (creates the motion sensor)
+- `videoConfig.subSource` must be configured with your camera's sub stream
+- Your camera must provide a lower-resolution stream (typically called "sub stream" or "stream1")
+
+#### Configuration Options
+
+- `ffmpegMotionDetection`: Enable automatic motion detection (Default: `false`)
+- `ffmpegMotionSensitivity`: Detection threshold, lower = more sensitive (0.01-0.1, Default: `0.03`)
+- `motionTimeout`: Seconds before resetting the motion sensor (Default: `1`)
+- `videoConfig.subSource`: FFmpeg arguments for the sub stream (same syntax as `source`)
+
+#### FFmpeg Motion Detection Example
+
+```json
+{
+  "platform": "Camera-ffmpeg",
+  "cameras": [
+    {
+      "name": "Front Camera",
+      "motion": true,
+      "ffmpegMotionDetection": true,
+      "ffmpegMotionSensitivity": 0.04,
+      "motionTimeout": 15,
+      "videoConfig": {
+        "source": "-rtsp_transport tcp -i rtsp://camera.local:554/stream0",
+        "subSource": "-rtsp_transport tcp -i rtsp://camera.local:554/stream1",
+        "stillImageSource": "http://camera.local/snapshot.jpg"
+      }
+    }
+  ]
+}
+```
+
+**Important Notes:**
+- Stream 0 is typically the main/high-resolution stream
+- Stream 1 is typically the sub/low-resolution stream
+- Using the sub stream reduces CPU usage during motion analysis
+- Motion detection runs continuously and independently from HomeKit streaming
+- The process auto-restarts on failure with a 10-second delay
 
 ### Automation Parameters
 
