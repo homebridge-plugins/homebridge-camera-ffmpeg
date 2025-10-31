@@ -51,12 +51,15 @@ export interface CameraConfig {
   switches?: boolean
   motionTimeout?: number
   motionDoorbell?: boolean
+  ffmpegMotionDetection?: boolean
+  ffmpegMotionSensitivity?: number
   mqtt?: MqttCameraConfig
   videoConfig?: VideoConfig
 }
 
 export interface VideoConfig {
   source?: string
+  subSource?: string
   stillImageSource?: string
   returnAudioTarget?: string
   maxStreams?: number

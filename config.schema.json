@@ -119,6 +119,19 @@
             "type": "boolean",
             "description": "Rings the doorbell when motion is activated. This allows for motion alerts to appear on Apple TVs."
           },
+          "ffmpegMotionDetection": {
+            "title": "FFmpeg Motion Detection",
+            "type": "boolean",
+            "description": "Enables automatic motion detection by analyzing the video stream using FFmpeg scene change detection. Requires subSource to be configured in Video Configuration."
+          },
+          "ffmpegMotionSensitivity": {
+            "title": "FFmpeg Motion Sensitivity",
+            "type": "number",
+            "placeholder": 0.03,
+            "minimum": 0.01,
+            "maximum": 0.1,
+            "description": "Sensitivity threshold for FFmpeg motion detection. Lower values are more sensitive (0.01-0.1). Default is 0.03."
+          },
           "videoConfig": {
             "title": "Video Configuration",
             "type": "object",
@@ -129,6 +142,12 @@
                 "placeholder": "-i rtsp://username:password@example.com:554",
                 "required": true,
                 "description": "FFmpeg options on where to find and how to decode your camera's video stream. The most basic form is '-i' followed by your camera's URL."
+              },
+              "subSource": {
+                "title": "Sub Stream Source (for Motion Detection)",
+                "type": "string",
+                "placeholder": "rtsp://username:password@example.com:554/sub",
+                "description": "A lower resolution stream URL for FFmpeg motion detection. Using a sub stream reduces CPU usage. Required if FFmpeg Motion Detection is enabled."
               },
               "stillImageSource": {
                 "title": "Still Image Source",
@@ -323,6 +342,7 @@
           "items": [
             "cameras[].name",
             "cameras[].videoConfig.source",
+            "cameras[].videoConfig.subSource",
             "cameras[].videoConfig.stillImageSource",
             "cameras[].videoConfig.audio",
             {
@@ -394,6 +414,8 @@
                 "cameras[].switches",
                 "cameras[].motionTimeout",
                 "cameras[].motionDoorbell",
+                "cameras[].ffmpegMotionDetection",
+                "cameras[].ffmpegMotionSensitivity",
                 {
                   "key": "cameras[]",
                   "type": "section",

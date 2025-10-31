@@ -67,7 +67,7 @@ The project uses Vitest for testing. Test files are excluded from the TypeScript
 1. **Live Streaming**: HomeKit → StreamingDelegate → FFmpeg → RTP/SRTP stream
 2. **Snapshots**: HomeKit → StreamingDelegate → FFmpeg (or direct HTTP fetch) → JPEG
 3. **HSV Recording**: Motion event → RecordingDelegate → PreBuffer → FFmpeg → MP4 fragments → HomeKit
-4. **Motion Detection**: FFmpeg scene filter → FfmpegProcess callback → Platform motion handler
+4. **FFmpeg Motion Detection**: subSource stream → FFmpeg scene filter → Platform.startMotionDetection() → motionHandler() → HomeKit
 5. **Automation**: MQTT/HTTP → Platform handlers → Update HomeKit characteristics
 
 ### Key Design Patterns
@@ -132,6 +132,37 @@ The plugin intelligently chooses between two methods for fetching snapshots:
 - Example: `"stillImageSource": "-i rtsp://192.168.1.100:554/stream"`
 
 The detection is automatic and transparent to the user.
+
+### FFmpeg Motion Detection
+The plugin supports automatic motion detection by analyzing the video stream:
+
+**How It Works**
+- Uses FFmpeg's scene change detection filter (`select='gt(scene,threshold)'`)
+- Analyzes a lower-resolution stream (`subSource`) to reduce CPU usage
+- Triggers the existing motion sensor when significant scene changes are detected
+- Includes configurable sensitivity and cooldown periods
+
+**Configuration**
+- `ffmpegMotionDetection` (boolean) - Enables automatic motion detection
+- `ffmpegMotionSensitivity` (number, 0.01-0.1) - Threshold for scene changes (default: 0.03)
+  - Lower values = more sensitive
+  - Higher values = less sensitive
+- `videoConfig.subSource` (string) - Direct RTSP URL for motion analysis
+  - Example: `"rtsp://camera.local:554/sub"` (no `-i` prefix needed)
+  - Should be a lower resolution stream than main source
+- `motionTimeout` (seconds) - Reused for motion cooldown period (default: 15)
+
+**Implementation Details** (platform.ts)
+- Motion detection process runs independently from streaming
+- Auto-restarts on failure with 10-second delay
+- Scene scores are logged when motion is detected
+- Integrates with existing `motionHandler()` to trigger HomeKit notifications
+- Process lifecycle managed in `motionDetectionProcesses` Map
+
+**Requirements**
+- `motion: true` must be enabled (creates the motion sensor)
+- `videoConfig.subSource` must be configured
+- Camera must provide a sub stream URL
 
 ### FFmpeg Integration
 - All FFmpeg commands are split by whitespace and passed as argv arrays
