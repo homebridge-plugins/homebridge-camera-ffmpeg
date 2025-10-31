@@ -24,7 +24,11 @@ Other users have been sharing configurations that work for them on our GitHub si
 - `platform`: _(Required)_ Must always be set to `Camera-ffmpeg`.
 - `name`: _(Required)_ Set the camera name for display in the Home app.
 - `source`: _(Required)_ FFmpeg options on where to find and how to decode your camera's video stream. The most basic form is `-i` followed by your camera's URL.
-- `stillImageSource`: If your camera also provides a URL for a still image, that can be defined here with the same syntax as `source`. If not set, the plugin will grab one frame from `source`.
+- `subSource`: FFmpeg options for a lower resolution stream. Uses the same syntax as `source` (e.g., `-rtsp_transport tcp -i rtsp://camera.local:554/stream1`). **Required if you want to use `ffmpegMotionDetection`** - without this, automatic motion detection will not work. Should point to your camera's sub/low-resolution stream to reduce CPU usage.
+- `stillImageSource`: If your camera provides a snapshot URL, you can define it here. Supports two formats:
+  - **Direct URL** (recommended, faster): `http://camera.local/snapshot.jpg` - fetches images directly via HTTP/HTTPS
+  - **FFmpeg source**: `-i rtsp://camera.local:554/stream` - uses FFmpeg to extract a frame (required for RTSP or when filters are needed)
+  - If not set, the plugin will grab one frame from `source`.
 
 #### Config Example
 
@@ -35,8 +39,9 @@ Other users have been sharing configurations that work for them on our GitHub si
     {
       "name": "Camera Name",
       "videoConfig": {
-        "source": "-i rtsp://username:password@example.com:554",
-        "stillImageSource": "-i http://example.com/still_image.jpg",
+        "source": "-i rtsp://username:password@example.com:554/stream0",
+        "subSource": "-i rtsp://username:password@example.com:554/stream1",
+        "stillImageSource": "http://example.com/snapshot.jpg",
         "maxStreams": 2,
         "maxWidth": 1280,
         "maxHeight": 720,
@@ -89,7 +94,6 @@ Other users have been sharing configurations that work for them on our GitHub si
 
 ### Optional videoConfig Parameters
 
-- `subSource`: FFmpeg options for a lower resolution stream used for motion detection. Uses the same syntax as `source`. This should point to your camera's sub stream (typically stream1). Required if `ffmpegMotionDetection` is enabled. Example: `-rtsp_transport tcp -i rtsp://camera.local:554/stream1`
 - `returnAudioTarget`: _(EXPERIMENTAL - WIP)_ The FFmpeg output command for directing audio back to a two-way capable camera. This feature is still in development and a configuration that works today may not work in the future.
 - `maxStreams`: The maximum number of streams that will be allowed at once to this camera. (Default: `2`)
 - `maxWidth`: The maximum width used for video streamed to HomeKit. If set to 0, the resolution of the source is used. If not set, will use any size HomeKit requests.
