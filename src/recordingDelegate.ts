@@ -83,7 +83,7 @@ export async function* parseFragmentedMP4(readable: Readable): AsyncGenerator<MP
   while (true) {
     const header = await readLength(readable, 8)
     const length = header.readInt32BE(0) - 8
-    const type = header.slice(4).toString()
+    const type = header.subarray(4).toString()
     const data = await readLength(readable, length)
 
     yield {
@@ -109,7 +109,7 @@ export class RecordingDelegate implements CameraRecordingDelegate {
 
   async *handleRecordingStreamRequest(streamId: number): AsyncGenerator<RecordingPacket, any, any> {
     this.log.info(`Recording stream request received for stream ID: ${streamId}`, this.cameraName)
-    
+
     if (!this.currentRecordingConfiguration) {
       this.log.error('No recording configuration available', this.cameraName)
       return
@@ -134,32 +134,32 @@ export class RecordingDelegate implements CameraRecordingDelegate {
     try {
       // Use existing handleFragmentsRequests method but track the process
       const fragmentGenerator = this.handleFragmentsRequests(this.currentRecordingConfiguration, streamId)
-      
+
       let fragmentCount = 0
       let totalBytes = 0
-      
+
       for await (const fragmentBuffer of fragmentGenerator) {
         // Check if stream was aborted
         if (abortController.signal.aborted) {
           this.log.debug(`Recording stream ${streamId} aborted, stopping generator`, this.cameraName)
           break
         }
-        
+
         fragmentCount++
         totalBytes += fragmentBuffer.length
-        
+
         // Enhanced logging for HKSV debugging
         this.log.debug(`HKSV: Yielding fragment #${fragmentCount}, size: ${fragmentBuffer.length}, total: ${totalBytes} bytes`, this.cameraName)
-        
+
         yield {
           data: fragmentBuffer,
           isLast: false // We'll handle the last fragment properly when the stream ends
         }
       }
-      
+
       // Send final packet to indicate end of stream
       this.log.info(`HKSV: Recording stream ${streamId} completed. Total fragments: ${fragmentCount}, total bytes: ${totalBytes}`, this.cameraName)
-      
+
     } catch (error) {
       this.log.error(`Recording stream error: ${error}`, this.cameraName)
       // Send error indication
@@ -176,7 +176,7 @@ export class RecordingDelegate implements CameraRecordingDelegate {
 
   closeRecordingStream(streamId: number, reason: HDSProtocolSpecificErrorReason | undefined): void {
     this.log.info(`Recording stream closed for stream ID: ${streamId}, reason: ${reason}`, this.cameraName)
-    
+
     // Enhanced reason code diagnostics for HKSV debugging
     switch (reason) {
       case 0:
@@ -216,7 +216,7 @@ export class RecordingDelegate implements CameraRecordingDelegate {
       abortController.abort()
       this.streamAbortControllers.delete(streamId)
     }
-    
+
     // Kill any active FFmpeg processes for this stream
     const process = this.activeFFmpegProcesses.get(streamId)
     if (process && !process.killed) {
@@ -236,7 +236,7 @@ export class RecordingDelegate implements CameraRecordingDelegate {
   readonly controller?: CameraController
   private preBufferSession?: Mp4Session
   private preBuffer?: PreBuffer
-  
+
   // Add fields for recording configuration and process management
   private currentRecordingConfiguration?: CameraRecordingConfiguration
   private activeFFmpegProcesses = new Map<number, ChildProcess>()
@@ -254,7 +254,7 @@ export class RecordingDelegate implements CameraRecordingDelegate {
         this.preBufferSession.process?.kill()
         this.preBufferSession.server?.close()
       }
-      
+
       // Cleanup active streams on shutdown
       this.activeFFmpegProcesses.forEach((process, streamId) => {
         if (!process.killed) {
@@ -283,7 +283,7 @@ export class RecordingDelegate implements CameraRecordingDelegate {
   async * handleFragmentsRequests(configuration: CameraRecordingConfiguration, streamId: number): AsyncGenerator<Buffer, void, unknown> {
     let moofBuffer: Buffer | null = null
     let fragmentCount = 0
-    
+
     this.log.debug('HKSV: Starting recording request', this.cameraName)
     const audioArgs: Array<string> = [
       '-acodec',
@@ -315,7 +315,7 @@ export class RecordingDelegate implements CameraRecordingDelegate {
       '-profile:v', profile,          // Use configuration profile
       '-level:v', level,              // Use configuration level
       '-preset', 'veryfast',          // Faster than ultrafast for stability
-      '-tune', 'zerolatency',         
+      '-tune', 'zerolatency',
       '-b:v', `${configuration.videoCodec.parameters.bitRate}k`, // Use configured bitrate
       '-maxrate', `${Math.floor(configuration.videoCodec.parameters.bitRate * 1.2)}k`, // 20% overhead
       '-bufsize', `${configuration.videoCodec.parameters.bitRate * 2}k`,              // 2x bitrate for buffer
@@ -351,7 +351,7 @@ export class RecordingDelegate implements CameraRecordingDelegate {
       this.log.debug(`HKSV: Using direct source for recording input`, this.cameraName)
       ffmpegInput.push(...this.videoConfig.source.trim().split(/\s+/).filter(arg => arg.length > 0))
     }
-    
+
     if (ffmpegInput.length === 0) {
       throw new Error('No video source configured for recording')
     }
@@ -362,7 +362,7 @@ export class RecordingDelegate implements CameraRecordingDelegate {
       session = await this.startFFMPegFragmetedMP4Session(this.videoProcessor, ffmpegInput, videoArgs)
       cp = session.cp
       generator = session.generator
-      
+
       // Track process for cleanup
       this.activeFFmpegProcesses.set(streamId, cp)
       this.log.debug(`HKSV: FFmpeg process started for stream ${streamId}, PID: ${cp.pid}`, this.cameraName)
@@ -373,13 +373,13 @@ export class RecordingDelegate implements CameraRecordingDelegate {
 
     let pending: Array<Buffer> = []
     let isFirstFragment = true
-    
+
     try {
       for await (const box of generator) {
         const { header, type, data } = box
-        pending.push(header, data)
 
         if (isFirstFragment) {
+          pending.push(header, data) // It only accumulates up to the moov
           if (type === 'moov') {
             const fragment = Buffer.concat(pending)
             pending = []
@@ -392,10 +392,10 @@ export class RecordingDelegate implements CameraRecordingDelegate {
             moofBuffer = Buffer.concat([header, data])
           } else if (type === 'mdat' && moofBuffer) {
             const fragment = Buffer.concat([moofBuffer, header, data])
+            moofBuffer = null // Immediately releases the moofBuffer reference.
             fragmentCount++
             this.log.debug(`HKSV: Fragment ${fragmentCount}, size: ${fragment.length}`, this.cameraName)
             yield fragment
-            moofBuffer = null
           }
         }
       }
@@ -403,10 +403,22 @@ export class RecordingDelegate implements CameraRecordingDelegate {
       this.log.debug(`Recording completed: ${e}`, this.cameraName)
     } finally {
       // Fast cleanup
-      if (cp && !cp.killed) {
-        cp.kill('SIGTERM')
-        setTimeout(() => cp.killed || cp.kill('SIGKILL'), 2000)
+      if (cp) {
+        cp.stdout?.destroy();
+        cp.stderr?.destroy();
+        if (!cp.killed) {
+          cp.kill('SIGTERM')
+          setTimeout(() => cp.killed || cp.kill('SIGKILL'), 2000)
+        }
       }
+
+      // Explicit cleaning to help the GC
+      (session as any) = null;
+      (generator as any) = null;
+      (cp as any) = null;
+      pending = [];
+      moofBuffer = null;
+
       this.activeFFmpegProcesses.delete(streamId)
     }
   }
@@ -417,7 +429,7 @@ export class RecordingDelegate implements CameraRecordingDelegate {
   }> {
     return new Promise((resolve, reject) => {
       const args: string[] = ['-hide_banner', ...ffmpegInput]
-      
+
       // Add dummy audio for HKSV compatibility if needed
       if (this.videoConfig?.audio === false) {
         args.push(
@@ -431,34 +443,34 @@ export class RecordingDelegate implements CameraRecordingDelegate {
         '-movflags', 'frag_keyframe+empty_moov+default_base_moof+omit_tfhd_offset',
         'pipe:1'
       )
-      
+
       // Terminate any previous process quickly
       if (this.process && !this.process.killed) {
         this.process.kill('SIGKILL')
       }
-      
-      this.process = spawn(ffmpegPath, args, { 
-        env, 
+
+      this.process = spawn(ffmpegPath, args, {
+        env,
         stdio: ['pipe', 'pipe', 'pipe']
       })
-      
+
       const cp = this.process
       let processKilledIntentionally = false
-      
+
       // Optimized MP4 generator
       async function* generator() {
         if (!cp.stdout) throw new Error('FFmpeg stdout unavailable')
-        
+
         while (true) {
           try {
             const header = await readLength(cp.stdout, 8)
             const length = header.readInt32BE(0) - 8
             const type = header.slice(4).toString()
-            
+
             if (length < 0 || length > 50 * 1024 * 1024) { // Max 50MB
               throw new Error(`Invalid MP4 box: ${length}B for ${type}`)
             }
-            
+
             const data = await readLength(cp.stdout, length)
             yield { header, length, type, data }
           } catch (error) {
@@ -467,7 +479,7 @@ export class RecordingDelegate implements CameraRecordingDelegate {
           }
         }
       }
-      
+
       // Minimal stderr handling
       if (cp.stderr) {
         cp.stderr.on('data', (data) => {
@@ -477,18 +489,18 @@ export class RecordingDelegate implements CameraRecordingDelegate {
           }
         })
       }
-      
+
       cp.on('spawn', () => {
         resolve({ generator: generator(), cp })
       })
 
       cp.on('error', reject)
-      
+
       cp.on('exit', (code, signal) => {
         if (code !== 0 && !processKilledIntentionally && code !== 255) {
           this.log.warn(`FFmpeg exited with code ${code}`, this.cameraName)
         }
-        
+
         // Enhanced process cleanup and error handling
         cp.on('exit', (code, signal) => {
           this.log.debug(`DEBUG: FFmpeg process ${cp.pid} exited with code ${code}, signal ${signal}`, this.cameraName)
@@ -496,12 +508,12 @@ export class RecordingDelegate implements CameraRecordingDelegate {
             this.log.warn(`HKSV: FFmpeg exited with non-zero code ${code}, this may indicate stream issues`, this.cameraName)
           }
         })
-        
+
         cp.on('error', (error) => {
           this.log.error(`DEBUG: FFmpeg process error: ${error}`, this.cameraName)
         })
       })
-      
+
       // Fast cleanup
       const cleanup = () => {
         processKilledIntentionally = true
@@ -510,8 +522,8 @@ export class RecordingDelegate implements CameraRecordingDelegate {
           setTimeout(() => cp.killed || cp.kill('SIGKILL'), 2000)
         }
       }
-      
-      ;(cp as any).cleanup = cleanup
+
+        ; (cp as any).cleanup = cleanup
     })
   }
 }
