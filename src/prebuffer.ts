@@ -12,8 +12,6 @@ import { env } from 'node:process'
 import { listenServer, parseFragmentedMP4 } from './recordingDelegate.js'
 import { PrebufferFmp4, Mp4Session, defaultPrebufferDuration } from './settings.js'
 
-export let prebufferSession: Mp4Session
-
 export class PreBuffer {
   prebufferFmp4: Array<PrebufferFmp4> = []
   events = new EventEmitter()
@@ -27,6 +25,9 @@ export class PreBuffer {
   private readonly ffmpegInput: string
   private readonly cameraName: string
   private readonly ffmpegPath: string
+  private prebufferSession?: Mp4Session
+  private startPromise?: Promise<Mp4Session>
+  private startGeneration = 0
   // private process: ChildProcessWithoutNullStreams;
 
   constructor(log: Logger, ffmpegInput: string, cameraName: string, videoProcessor: string) {
@@ -36,10 +37,47 @@ export class PreBuffer {
     this.ffmpegPath = videoProcessor
   }
 
-  async startPreBuffer(): Promise<Mp4Session> {
-    if (prebufferSession) {
-      return prebufferSession
+  startPreBuffer(): Promise<Mp4Session> {
+    if (this.prebufferSession) {
+      return Promise.resolve(this.prebufferSession)
     }
+
+    if (!this.startPromise) {
+      const startGeneration = this.startGeneration
+      this.startPromise = this.createPreBuffer(startGeneration).then((session) => {
+        if (startGeneration !== this.startGeneration) {
+          this.closeSession(session)
+          throw new Error('Prebuffer start cancelled')
+        }
+        this.prebufferSession = session
+        return session
+      }).catch((error) => {
+        if (startGeneration === this.startGeneration) {
+          this.startPromise = undefined
+        }
+        throw error
+      })
+    }
+
+    return this.startPromise
+  }
+
+  stopPreBuffer(): void {
+    this.startGeneration++
+    if (this.prebufferSession) {
+      this.closeSession(this.prebufferSession)
+    }
+    this.prebufferSession = undefined
+    this.startPromise = undefined
+    this.events.emit('killed')
+  }
+
+  private closeSession(session: Mp4Session): void {
+    session.process.kill()
+    session.server.close()
+  }
+
+  private async createPreBuffer(startGeneration: number): Promise<Mp4Session> {
     this.log.debug('start prebuffer', this.cameraName)
     // eslint-disable-next-line unused-imports/no-unused-vars
     const acodec = [
@@ -83,6 +121,10 @@ export class PreBuffer {
       }
     })
     const fmp4Port = await listenServer(fmp4OutputServer, this.log)
+    if (startGeneration !== this.startGeneration) {
+      fmp4OutputServer.close()
+      throw new Error('Prebuffer start cancelled')
+    }
 
     const ffmpegOutput = [
       '-f',
@@ -98,8 +140,6 @@ export class PreBuffer {
     args.push(...this.ffmpegInput.split(' '))
     args.push(...ffmpegOutput)
 
-    this.log.info(`${this.ffmpegPath} ${args.join(' ')}`, this.cameraName)
-
     const debug = false
 
     const stdioValue = debug ? 'pipe' : 'ignore'
@@ -110,9 +150,7 @@ export class PreBuffer {
       cp.stderr?.on('data', data => this.log.debug(data.toString(), this.cameraName))
     }
 
-    prebufferSession = { server: fmp4OutputServer, process: cp }
-
-    return prebufferSession
+    return { server: fmp4OutputServer, process: cp }
   }
 
   async getVideo(requestedPrebuffer: number): Promise<Array<string>> {

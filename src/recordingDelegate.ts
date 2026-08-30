@@ -6,7 +6,6 @@ import type { API, CameraController, CameraRecordingConfiguration, CameraRecordi
 
 import type { VideoConfig } from './settings.js'
 import type { Logger } from './logger.js'
-import type { Mp4Session } from './settings.js'
 
 import { Buffer } from 'node:buffer'
 import { spawn } from 'node:child_process'
@@ -234,7 +233,6 @@ export class RecordingDelegate implements CameraRecordingDelegate {
 
   private readonly videoProcessor: string
   readonly controller?: CameraController
-  private preBufferSession?: Mp4Session
   private preBuffer?: PreBuffer
   
   // Add fields for recording configuration and process management
@@ -250,10 +248,7 @@ export class RecordingDelegate implements CameraRecordingDelegate {
     this.videoProcessor = videoProcessor || ffmpegPathString || 'ffmpeg'
 
     api.on(APIEvent.SHUTDOWN, () => {
-      if (this.preBufferSession) {
-        this.preBufferSession.process?.kill()
-        this.preBufferSession.server?.close()
-      }
+      this.preBuffer?.stopPreBuffer()
       
       // Cleanup active streams on shutdown
       this.activeFFmpegProcesses.forEach((process, streamId) => {
@@ -273,10 +268,8 @@ export class RecordingDelegate implements CameraRecordingDelegate {
       // looks like the setupAcessory() is called multiple times during startup. Ensure that Prebuffer runs only once
       if (!this.preBuffer) {
         this.preBuffer = new PreBuffer(this.log, this.videoConfig.source ?? '', this.cameraName, this.videoProcessor)
-        if (!this.preBufferSession) {
-          this.preBufferSession = await this.preBuffer.startPreBuffer()
-        }
       }
+      await this.preBuffer.startPreBuffer()
     }
   }
 
